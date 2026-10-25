@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier Re:Zero</title>
+<link rel="icon" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="barre">
+  <div class="marque"><span class="bocal" aria-hidden="true"></span><b>Atelier Re:Zero</b><small>le pixel art du tower defense</small></div>
+  <nav class="onglets" role="tablist">
+    <button role="tab" data-vue="biblio" class="actif">Bibliothèque</button>
+    <button role="tab" data-vue="atelier">Atelier</button>
+  </nav>
+  <div class="etat" id="etat"></div>
+  <button class="bouton" id="b-actualiser" title="Voir tout de suite ce que les autres ont enregistré (sinon, ça se fait tout seul toutes les 30 secondes)">⟳ Actualiser</button>
+  <button class="bouton" id="b-pseudo" title="Ton pseudo (il signe tes dessins)">☺</button>
+</header>
+
+<main>
+  <!-- ============ Bibliothèque ============ -->
+  <section id="vue-biblio" class="vue">
+    <aside class="cats" id="cats"></aside>
+    <div class="biblio">
+      <div class="filtres">
+        <input type="search" id="f-recherche" placeholder="Chercher : nom, tag, skin, fichier…  ( / )">
+        <label>Trier
+          <select id="f-tri">
+            <option value="ordre">ordre du jeu</option>
+            <option value="nom">nom</option>
+            <option value="grand">taille (grands d’abord)</option>
+            <option value="petit">taille (petits d’abord)</option>
+            <option value="couleurs">nombre de couleurs</option>
+            <option value="recent">dernières retouches</option>
+          </select>
+        </label>
+        <label class="case"><input type="checkbox" id="f-groupes" checked> par groupes</label>
+        <label class="case"><input type="checkbox" id="f-modifies"> retouchés</label>
+        <label class="case"><input type="checkbox" id="f-favoris"> ★ favoris</label>
+        <label class="curseur" title="Taille des vignettes">▣ <input type="range" id="f-taille" min="56" max="200" value="96"></label>
+        <select id="f-fond" title="Fond des vignettes">
+          <option value="damier">damier</option>
+          <option value="bureau">herbe</option>
+          <option value="barre">pavés</option>
+          <option value="clair">clair</option>
+        </select>
+        <span class="espace"></span>
+        <button class="bouton" id="b-importer-png" title="Ajouter des PNG depuis ton PC (tu peux aussi les glisser ici)">⇪ Ajouter des PNG</button>
+        <button class="bouton accent" id="b-nouveau">+ Nouveau dessin</button>
+        <input type="file" id="fichiers-png" accept="image/png,image/gif,image/webp" multiple hidden>
+      </div>
+      <div class="tags-filtre" id="tags-filtre"></div>
+      <div class="grille" id="grille"></div>
+    </div>
+    <aside class="fiche" id="fiche"></aside>
+  </section>
+
+  <!-- ============ Atelier (l'éditeur) ============ -->
+  <section id="vue-atelier" class="vue" hidden>
+    <div class="outils" id="outils"></div>
+    <div class="plan">
+      <div class="options" id="options-outil"></div>
+      <div class="scene" id="scene">
+        <canvas id="ecran"></canvas>
+        <div class="vide" id="atelier-vide">
+          <p>Rien d’ouvert.</p>
+          <p>Choisis un asset dans la <a href="#" data-vue-lien="biblio">bibliothèque</a> (double-clic), ou fais un <a href="#" id="lien-nouveau">nouveau dessin</a>.</p>
+        </div>
+      </div>
+      <div class="infos" id="infos"></div>
+    </div>
+    <aside class="panneau" id="panneau">
+      <div class="titre-doc" id="titre-doc"></div>
+      <section class="bloc" id="bloc-images" hidden>
+        <h3>Images du groupe <small><kbd>Pg↑</kbd> <kbd>Pg↓</kbd></small></h3>
+        <div class="images-groupe" id="images-groupe"></div>
+      </section>
+      <section class="bloc">
+        <h3>Couleur</h3>
+        <div class="couleurs-actives">
+          <button class="pastille grande" id="c-prim" title="Couleur principale (clic gauche)"></button>
+          <button class="pastille grande second" id="c-sec" title="Couleur secondaire (clic droit)"></button>
+          <button class="mini" id="c-echanger" title="Échanger (X)">⇄</button>
+        </div>
+        <div class="reglage-couleur">
+          <input type="color" id="c-choix" title="Choisir">
+          <input type="text" id="c-hex" spellcheck="false" maxlength="9">
+          <label title="Opacité (les bocaux en verre en utilisent)">α <input type="range" id="c-alpha" min="0" max="255"> <output id="c-alpha-v"></output></label>
+        </div>
+      </section>
+      <section class="bloc">
+        <h3>Palettes
+          <select id="p-choix"></select>
+        </h3>
+        <div class="nuancier" id="nuancier"></div>
+        <div class="ligne-boutons" id="p-actions"></div>
+      </section>
+      <section class="bloc">
+        <h3>Dans ce dessin <small id="nb-couleurs"></small></h3>
+        <div class="nuancier petit" id="couleurs-image"></div>
+      </section>
+      <section class="bloc">
+        <h3>Aperçu <select id="a-fond"><option value="bureau">herbe</option><option value="barre">pavés</option><option value="damier">damier</option><option value="clair">clair</option></select></h3>
+        <div class="apercus" id="apercus">
+          <canvas id="a-x1" title="Taille réelle"></canvas>
+          <canvas id="a-x3" title="Comme dans le jeu (×3)"></canvas>
+        </div>
+        <div class="anim" id="bloc-anim">
+          <canvas id="a-anim" title="L’animation de son groupe"></canvas>
+          <label>images/s <input type="range" id="a-fps" min="1" max="16" value="6"> <output id="a-fps-v">6</output></label>
+        </div>
+      </section>
+      <section class="bloc">
+        <h3>Pelure d’oignon</h3>
+        <select id="o-ref"></select>
+        <label>opacité <input type="range" id="o-opacite" min="5" max="90" value="35"></label>
+        <label class="case"><input type="checkbox" id="o-dessus"> par-dessus</label>
+      </section>
+      <section class="bloc">
+        <h3>Transformer <small>(la sélection, sinon tout)</small></h3>
+        <div class="ligne-boutons">
+          <button class="bouton petit" data-tr="miroirH" title="Miroir gauche/droite">⇋ Miroir</button>
+          <button class="bouton petit" data-tr="miroirV" title="Miroir haut/bas">⇵ Miroir</button>
+          <button class="bouton petit" data-tr="tournerG" title="Tourner d’un quart à gauche">⟲ 90°</button>
+          <button class="bouton petit" data-tr="tournerD" title="Tourner d’un quart à droite">⟳ 90°</button>
+          <button class="bouton petit" data-tr="contour" title="Ajoute un contour d’un pixel autour de la forme, avec la couleur principale (comme dans le jeu)">◌ Contour</button>
+          <button class="bouton petit" data-tr="ajuster" title="Teinte, saturation, luminosité">🎨 Couleurs…</button>
+          <button class="bouton petit" data-tr="taille" title="Changer la taille de la toile">⬚ Toile…</button>
+          <button class="bouton petit" data-tr="rogner" title="Rogner au plus près du dessin">✂ Rogner</button>
+          <button class="bouton petit" data-tr="x2" title="Agrandir ×2 (chaque pixel devient 2×2)">×2</button>
+          <button class="bouton petit" data-tr="d2" title="Réduire de moitié">÷2</button>
+        </div>
+      </section>
+      <section class="bloc actions-doc">
+        <button class="bouton accent" id="b-enregistrer" title="Ctrl+S">Enregistrer</button>
+        <button class="bouton" id="b-enregistrer-sous">Enregistrer comme nouveau…</button>
+        <button class="bouton" id="b-exporter" title="Télécharger le PNG">⇩ PNG</button>
+        <button class="bouton" id="b-comparer" title="Maintiens pour voir l’original du jeu">◐ Original</button>
+      </section>
+    </aside>
+  </section>
+</main>
+
+<!-- ============ Fenêtres ============ -->
+<dialog id="dlg-nouveau">
+  <form method="dialog">
+    <h2 id="dlg-nouveau-titre">Nouveau dessin</h2>
+    <label>Nom <input name="nom" required placeholder="ex. Pièce de platine"></label>
+    <label>Catégorie <select name="categorie"></select></label>
+    <label>Groupe <small>(pour les animations : mets le même groupe à toutes les images)</small><input name="groupe" placeholder="optionnel" list="groupes-connus"></label>
+    <datalist id="groupes-connus"></datalist>
+    <div class="taille-nouveau" id="taille-nouveau">
+      <label>Largeur <input name="l" type="number" min="1" max="512" value="16"></label>
+      <label>Hauteur <input name="h" type="number" min="1" max="512" value="16"></label>
+    </div>
+    <div class="modeles" id="modeles"></div>
+    <menu><button value="annuler" formnovalidate class="bouton">Annuler</button><button value="ok" class="bouton accent">Créer</button></menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-connexion">
+  <form method="dialog">
+    <h2>Bienvenue dans l’atelier</h2>
+    <p>Tout ce que tu enregistres ici est partagé : les autres le voient dans la minute, et Tiago le met dans le jeu.</p>
+    <label>Ton pseudo <small>(il signe tes dessins)</small><input name="pseudo" required maxlength="30" placeholder="ex. Natsuki"></label>
+    <label id="connexion-cle">La clé que Tiago t’a donnée <small>(elle reste dans ce navigateur)</small><input name="cle" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…"></label>
+    <p class="alerte-fiche" id="connexion-raison" hidden></p>
+    <menu><button value="ok" class="bouton accent">Entrer</button></menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-toile">
+  <form method="dialog">
+    <h2>Taille de la toile</h2>
+    <div class="taille-nouveau">
+      <label>Largeur <input name="l" type="number" min="1" max="512"></label>
+      <label>Hauteur <input name="h" type="number" min="1" max="512"></label>
+    </div>
+    <p>Où garder le dessin :</p>
+    <div class="ancres" id="ancres"></div>
+    <menu><button value="annuler" formnovalidate class="bouton">Annuler</button><button value="ok" class="bouton accent">Appliquer</button></menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-ajuster">
+  <form method="dialog">
+    <h2>Couleurs</h2>
+    <label>Teinte <input type="range" name="t" min="-180" max="180" value="0"> <output></output></label>
+    <label>Saturation <input type="range" name="s" min="-100" max="100" value="0"> <output></output></label>
+    <label>Luminosité <input type="range" name="l" min="-50" max="50" value="0"> <output></output></label>
+    <label class="case"><input type="checkbox" name="contours"> toucher aussi au contour sombre</label>
+    <menu><button value="annuler" formnovalidate class="bouton">Annuler</button><button value="ok" class="bouton accent">Appliquer</button></menu>
+  </form>
+</dialog>
+
+<div class="toasts" id="toasts"></div>
+<div class="depot" id="depot"><p>Lâche tes PNG ici : ils rejoignent les « Créations ».</p></div>
+
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
