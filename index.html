@@ -19,6 +19,7 @@
   <div class="etat" id="etat"></div>
   <button class="bouton" id="b-actualiser" title="Voir tout de suite ce que les autres ont enregistré (sinon, ça se fait tout seul toutes les 30 secondes)">⟳ Actualiser</button>
   <button class="bouton" id="b-pseudo" title="Ton pseudo (il signe tes dessins)">☺</button>
+  <button class="bouton" id="b-aide" title="Mode d’emploi et raccourcis (?)">?</button>
 </header>
 
 <main>
@@ -64,13 +65,33 @@
     <div class="outils" id="outils"></div>
     <div class="plan">
       <div class="options" id="options-outil"></div>
+      <div class="zone-travail">
       <div class="scene" id="scene">
         <canvas id="ecran"></canvas>
         <div class="vide" id="atelier-vide">
           <p>Rien d’ouvert.</p>
-          <p>Choisis un asset dans la <a href="#" data-vue-lien="biblio">bibliothèque</a> (double-clic), ou fais un <a href="#" id="lien-nouveau">nouveau dessin</a>.</p>
+          <p>Choisis un dessin dans la <a href="#" data-vue-lien="biblio">bibliothèque</a> (double-clic), ou fais un <a href="#" id="lien-nouveau">nouveau dessin</a>.</p>
+          <p id="reprendre-neuf" hidden></p>
         </div>
       </div>
+      <aside class="acote" id="acote" hidden>
+        <div class="poignee" id="acote-poignee" title="Glisse pour élargir ou rétrécir"></div>
+        <div class="acote-barre">
+          <b id="acote-nom">Image à côté</b>
+          <span class="espace"></span>
+          <button class="mini" id="acote-biblio" title="Une image de la bibliothèque (ta ref, une autre pose…)">▦ Bibliothèque…</button>
+          <button class="mini" id="acote-pc" title="Une image de ton PC (elle reste dans ton navigateur)">⇪ PC…</button>
+          <button class="mini" id="acote-ajuster" title="Tout voir (double-clic)">⤢</button>
+          <button class="mini" id="acote-fermer" title="Fermer (A)">✕</button>
+        </div>
+        <div class="acote-vue" id="acote-vue">
+          <canvas id="acote-toile"></canvas>
+          <div class="acote-vide"><p>Mets une image à côté de ta toile :</p><p><b>▦ Bibliothèque…</b> (ta ref, une autre pose…), <b>⇪ PC…</b>, ou glisse une image ici.</p><p><small>Clic : prendre sa couleur · clic droit : couleur secondaire · molette : zoom · glisser : bouger</small></p></div>
+        </div>
+        <div class="acote-infos" id="acote-infos"></div>
+        <input type="file" id="acote-fichier" accept="image/*" hidden>
+      </aside>
+    </div>
       <div class="infos" id="infos"></div>
     </div>
     <aside class="panneau" id="panneau">
@@ -102,6 +123,7 @@
       <section class="bloc">
         <h3>Dans ce dessin <small id="nb-couleurs"></small></h3>
         <div class="nuancier petit" id="couleurs-image"></div>
+        <div class="ligne-boutons"><button class="bouton petit bascule" id="b-groupe-couleur" hidden title="Clique ensuite une couleur du dessin : elle est remplacée par la couleur principale dans toutes les images de l’animation">↻ Remplacer une couleur dans tout le groupe</button></div>
       </section>
       <section class="bloc">
         <h3>Aperçu <select id="a-fond"><option value="bureau">herbe</option><option value="barre">pavés</option><option value="damier">damier</option><option value="clair">clair</option></select></h3>
@@ -173,7 +195,73 @@
   </form>
 </dialog>
 
+<dialog id="dlg-choisir" class="large">
+  <form method="dialog">
+    <h2>Mettre une image à côté</h2>
+    <input type="search" id="choisir-recherche" placeholder="Chercher : Subaru, repos, ref…">
+    <div class="tags-filtre" id="choisir-cats"></div>
+    <div class="choisir-grille" id="choisir-grille"></div>
+    <menu><button value="annuler" class="bouton">Fermer</button></menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-versions" class="large">
+  <form method="dialog">
+    <h2 id="versions-titre">Les versions</h2>
+    <p class="aide-dlg">Chaque enregistrement est gardé. « Reprendre » en refait la version actuelle (les autres restent dans l’historique).</p>
+    <div class="versions" id="versions-liste"></div>
+    <menu><button value="annuler" class="bouton">Fermer</button></menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-aide" class="large">
+  <form method="dialog">
+    <h2>Mode d’emploi</h2>
+    <div class="aide">
+      <section>
+        <h3>Le principe</h3>
+        <p>Tout ce que tu enregistres est <b>partagé</b> : les autres le voient en moins d’une minute (ou tout de suite avec ⟳ Actualiser). Rien n’est jamais perdu : chaque dessin garde toutes ses versions (« 🕘 Versions » dans sa fiche).</p>
+        <p><b>Double-clic</b> sur un dessin pour l’ouvrir. Quand une retouche est bonne : <b>⇢ Prêt pour le jeu</b> dans sa fiche, et Tiago la met dans le jeu.</p>
+        <p>Les <b>📌 À faire</b> (en haut à gauche) : les dessins qu’on t’a demandés, avec ce qu’il faut faire.</p>
+        <p><b>Garde la taille de la toile</b> pour une retouche : le jeu cale ses sprites sur les pieds.</p>
+      </section>
+      <section>
+        <h3>Outils</h3>
+        <table>
+          <tr><td><kbd>B</kbd></td><td>crayon</td><td><kbd>E</kbd></td><td>gomme</td></tr>
+          <tr><td><kbd>R</kbd></td><td>pot de peinture</td><td><kbd>I</kbd> / <kbd>Alt</kbd></td><td>pipette</td></tr>
+          <tr><td><kbd>L</kbd> <kbd>U</kbd> <kbd>O</kbd></td><td>ligne, rectangle, ellipse</td><td><kbd>M</kbd></td><td>sélection</td></tr>
+          <tr><td><kbd>V</kbd></td><td>déplacer</td><td><kbd>H</kbd> / <kbd>Espace</kbd></td><td>main</td></tr>
+          <tr><td><kbd>1</kbd>…<kbd>4</kbd></td><td>taille du pinceau</td><td><kbd>X</kbd></td><td>échanger les couleurs</td></tr>
+        </table>
+      </section>
+      <section>
+        <h3>Toile</h3>
+        <table>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>enregistrer</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd></td><td>annuler / refaire</td></tr>
+          <tr><td><kbd>Pg↑</kbd> <kbd>Pg↓</kbd></td><td>image d’avant / d’après du groupe</td><td><kbd>A</kbd></td><td>image à côté</td></tr>
+          <tr><td><kbd>G</kbd></td><td>grille</td><td><kbd>+</kbd> <kbd>-</kbd> <kbd>0</kbd></td><td>zoom</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd></td><td>copier / coller (même une image d’ailleurs)</td><td><kbd>Entrée</kbd> / <kbd>Échap</kbd></td><td>valider / annuler la sélection</td></tr>
+        </table>
+      </section>
+      <section>
+        <h3>Ce qui fait gagner du temps</h3>
+        <ul>
+          <li><b>◫ Image à côté</b> : ta ref ouverte à côté de la toile ; un clic dessus prend sa couleur.</li>
+          <li><b>Pelure d’oignon</b> : l’image d’avant de l’animation en transparence, pour caler la suivante.</li>
+          <li><b>Dans ce dessin</b> : <kbd>Maj</kbd>+clic sur une couleur la remplace par la couleur principale ; <b>↻ dans tout le groupe</b> le fait dans toutes les images de l’animation d’un coup.</li>
+          <li>En passant à l’image suivante (<kbd>Pg↓</kbd>), ton dessin s’enregistre tout seul (case « enregistrer en changeant d’image »).</li>
+          <li>Un <b>brouillon</b> est gardé dans ton navigateur à chaque trait : si l’onglet se ferme, il te sera proposé en rouvrant le dessin.</li>
+          <li>Si quelqu’un enregistre le même dessin que toi en même temps, l’atelier te prévient au lieu d’écraser son travail.</li>
+        </ul>
+      </section>
+    </div>
+    <menu><button value="annuler" class="bouton accent">Compris</button></menu>
+  </form>
+</dialog>
+
 <dialog id="dlg-toile">
+
   <form method="dialog">
     <h2>Taille de la toile</h2>
     <div class="taille-nouveau">

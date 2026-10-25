@@ -149,3 +149,18 @@ async function validerMaintenant(message, modifier) {
   }
   throw new Error('trop d’enregistrements en même temps, réessaie');
 }
+
+// ---------- L'historique d'un dessin ----------
+// Les commits qui ont touché ces fichiers, du plus récent au plus ancien : [{ sha, quand, auteur, message, chemin }]
+export async function historique(chemins) {
+  const listes = await Promise.all(chemins.map(async (chemin) => {
+    const r = await gh(`${REPO}/commits?path=${encodeURIComponent(chemin)}&per_page=40`);
+    return r.map((c) => ({ sha: c.sha, quand: c.commit.author?.date, auteur: c.commit.author?.name, message: c.commit.message, chemin }));
+  }));
+  return listes.flat().sort((a, b) => (b.quand || '').localeCompare(a.quand || ''));
+}
+// Le fichier tel qu'il était à un commit (null s'il n'existait pas à ce moment-là)
+export async function fichierA(chemin, sha) {
+  try { return await (await gh(`${REPO}/contents/${chemin.split('/').map(encodeURIComponent).join('/')}?ref=${sha}`, { brut: true })).blob(); }
+  catch (e) { if (e.status === 404) return null; throw e; }
+}

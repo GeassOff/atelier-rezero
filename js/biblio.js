@@ -1,6 +1,10 @@
 // La bibliothèque : tous les assets, rangés par catégorie, triables, avec leur fiche à droite.
-import { etat, CATEGORIES, nomCategorie, nomDe, catDe, sousCatDe, estRetouche, urlImage, urlOriginal, membresGroupe, enregistrer, retirerVersion, toast, quand, telecharger, marquerPourLeJeu, envoyable, verrouille } from './etat.js';
+import { etat, CATEGORIES, nomCategorie, nomDe, catDe, sousCatDe, estRetouche, urlImage, urlOriginal, membresGroupe, enregistrer, retirerVersion, toast, quand, telecharger, marquerPourLeJeu, marquerAFaire, envoyable, verrouille } from './etat.js';
+import * as depot from './depot.js';
 import * as px from './pixels.js';
+
+// Les listes du haut (pas des catégories)
+const SPECIALES = ['tout', 'afaire', 'creations-toutes', 'retouches', 'disparus', 'prets'];
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, attrs = {}, ...enfants) => {
@@ -74,8 +78,10 @@ function rendreCats() {
       onclick: () => { vue.cat = id; vue.sous = sous; vue.tags = []; rafraichir(); },
     }, sous ? null : el('span', { class: 'ic' }, a ? el('img', { src: urlImage(a), alt: '' }) : ''), el('span', { class: 'nom' }, nom), el('span', { class: 'nb' }, n));
   };
+  const afaire = nb((a) => a.aFaire);
   z.append(
     bouton('tout', 'Tout', liste.length, null),
+    afaire ? bouton('afaire', '📌 À faire', afaire, null) : '',
     bouton('creations-toutes', 'Créations', nb((a) => a.source === 'atelier'), null),
     bouton('retouches', 'Retouchés', nb(estRetouche), null),
   );
@@ -107,7 +113,8 @@ function filtrer() {
     if (vue.cat === 'retouches' && !estRetouche(a)) return false;
     if (vue.cat === 'disparus' && !a.disparu) return false;
     if (vue.cat === 'prets' && !a.pourLeJeu) return false;
-    if (!['tout', 'creations-toutes', 'retouches', 'disparus', 'prets'].includes(vue.cat) && catDe(a) !== vue.cat) return false;
+    if (vue.cat === 'afaire' && !a.aFaire) return false;
+    if (!SPECIALES.includes(vue.cat) && catDe(a) !== vue.cat) return false;
     if (vue.sous && sousCatDe(a) !== vue.sous) return false;
     if (vue.modifies && !estRetouche(a) && a.source !== 'atelier') return false;
     if (vue.favoris && !a.favori) return false;
@@ -143,7 +150,7 @@ function rendreGrille() {
   }
   // par groupes : une section par sous-catégorie (dans l'ordre où on les rencontre)
   const sections = new Map();
-  const titre = (a) => (vue.groupes ? (['tout', 'creations-toutes', 'retouches', 'disparus', 'prets'].includes(vue.cat) ? nomCategorie(catDe(a)) + ' · ' : '') + sousCatDe(a) : '');
+  const titre = (a) => (vue.groupes ? (SPECIALES.includes(vue.cat) ? nomCategorie(catDe(a)) + ' · ' : '') + sousCatDe(a) : '');
   for (const a of liste) {
     const t = titre(a);
     if (!sections.has(t)) sections.set(t, []);
@@ -166,6 +173,7 @@ function carte(a) {
   if (tropGrand) { img.style.maxWidth = cote + 'px'; img.style.maxHeight = cote + 'px'; }
   else { img.style.width = a.l * k + 'px'; img.style.height = a.h * k + 'px'; }
   const badges = el('div', { class: 'badges' },
+    a.aFaire ? el('span', { class: 'badge afaire', title: 'À faire' + (a.aFaire.texte ? ' : ' + a.aFaire.texte : '') + (a.aFaire.par ? ` (${a.aFaire.par})` : '') }, '📌') : null,
     a.favori ? el('span', { class: 'badge fav', title: 'Favori' }, '★') : null,
     a.source === 'atelier' ? el('span', { class: 'badge nouv', title: 'Création' + (a.creePar ? ' de ' + a.creePar : '') }, a.creePar || 'créa') : null,
     estRetouche(a) ? el('span', { class: 'badge modif', title: 'Retouché le ' + quand(a.modifie) + (a.modifiePar ? ' par ' + a.modifiePar : '') }, '✎') : null,
@@ -262,6 +270,7 @@ function rendreFiche() {
     el('div', { class: 'id' }, a.id + '.png'),
     a.jeuChange ? el('div', { class: 'alerte-fiche' }, 'L’original a changé dans le jeu depuis ta retouche. Maintiens « ◐ original » pour comparer.') : null,
     a.disparu ? el('div', { class: 'alerte-fiche' }, 'Ce dessin n’existe plus dans le code du jeu (il a été retiré ou renommé).') : null,
+    a.aFaire ? el('div', { class: 'afaire-fiche' }, el('b', {}, '📌 À faire'), a.aFaire.texte ? ' : ' + a.aFaire.texte : '', el('br'), el('small', {}, `demandé par ${a.aFaire.par || '?'}, le ${quand(a.aFaire.quand)}`)) : null,
     verrouille(a) ? el('div', { class: 'info-fiche' }, 'Une référence : elle se regarde (et la pipette y prend ses couleurs). Pour partir d’elle, « ⧉ Dupliquer » en fait une copie à retoucher.') : null,
     a.refus ? el('div', { class: 'alerte-fiche' }, 'Pas mis dans le jeu : ' + a.refus + '.') : null,
     a.pourLeJeu ? el('div', { class: 'info-fiche' }, 'Prêt pour le jeu depuis le ' + quand(a.pourLeJeu) + (a.pourLeJeuPar ? ' (' + a.pourLeJeuPar + ')' : '') + ' : ' + (a.source === 'jeu' ? 'il remplace l’image du jeu à la prochaine synchro.' : 'il part dans le projet Unity à la prochaine synchro, pour y être branché.')) : null,
@@ -283,9 +292,17 @@ function rendreFiche() {
     el('div', { class: 'actions' },
       el('button', { class: 'bouton accent', onclick: () => rappels.ouvrir(a) }, verrouille(a) ? '◉ Regarder dans l’atelier' : '✎ Ouvrir dans l’atelier'),
       envoyable(a) ? el('button', { class: 'bouton' + (a.pourLeJeu ? '' : ' accent'), onclick: () => envoyer(a, !a.pourLeJeu), title: 'La prochaine synchro le met dans le projet Unity' }, a.pourLeJeu ? '✕ Pas encore prêt' : '⇢ Prêt pour le jeu') : null,
+      groupePret(a, membres),
+      el('button', { class: 'bouton', onclick: () => rappels.aCote(a), title: 'L’ouvrir à côté de la toile, comme référence (un clic dessus y prend la couleur)' }, '◫ À côté'),
       el('button', { class: 'bouton', onclick: () => rappels.dupliquer(a), title: 'Une copie à toi, pour faire une variante' }, '⧉ Dupliquer'),
+      el('button', { class: 'bouton', onclick: () => versions(a), title: 'Toutes les versions enregistrées de ce dessin (et en reprendre une)' }, '🕘 Versions'),
+      a.aFaire
+        ? el('button', { class: 'bouton', onclick: () => aFaire([a.id], null), title: 'Retirer la demande' }, '✓ Fait')
+        : el('button', { class: 'bouton', onclick: () => demanderAFaire(a, [a.id]), title: 'Le mettre dans la liste « À faire », avec ce qu’il faut faire' }, '📌 À faire…'),
+      membres.length > 1 && !a.aFaire ? el('button', { class: 'bouton', onclick: () => demanderAFaire(a, membres.map((m) => m.id)), title: 'Toutes les images de l’animation dans « À faire »' }, `📌 Le groupe (${membres.length})…`) : null,
       el('button', { class: 'bouton', onclick: () => exporter(a, 1) }, '⇩ PNG'),
       el('button', { class: 'bouton', onclick: () => exporter(a, 4), title: 'Agrandi 4 fois, pour le montrer' }, '⇩ ×4'),
+      membres.length > 1 ? el('button', { class: 'bouton', onclick: () => planche(membres), title: 'Toutes les images de l’animation côte à côte, ×4 (pour la montrer sur Discord)' }, '⇩ Planche') : null,
       a.source === 'jeu' && estRetouche(a) ? el('button', { class: 'bouton danger', onclick: () => revenir(a) }, '↺ Revenir à l’original') : null,
       a.source === 'atelier' ? el('button', { class: 'bouton danger', onclick: () => supprimer(a) }, '🗑 Supprimer') : null,
     ),
@@ -296,7 +313,75 @@ async function exporter(a, k) {
   const img = px.deImage(await px.charger(urlImage(a)));
   telecharger(`${a.id.replace(/\//g, '_')}${k > 1 ? '@' + k + 'x' : ''}.png`, px.agrandie(img, k).toDataURL());
 }
+// « Prêt pour le jeu » pour toutes les retouches d'une animation d'un coup
+function groupePret(a, membres) {
+  const restent = membres.filter((m) => envoyable(m) && !m.pourLeJeu);
+  if (membres.length < 2 || restent.length < 2) return null;
+  return el('button', { class: 'bouton', title: 'Toutes les retouches de cette animation', onclick: async () => {
+    try { await marquerPourLeJeu(restent.map((m) => m.id), true); toast(`${restent.length} images prêtes pour le jeu`, 'ok'); }
+    catch (e) { toast('Pas enregistré : ' + e.message, 'ko'); }
+  } }, `⇢ Le groupe prêt (${restent.length})`);
+}
+async function demanderAFaire(a, ids) {
+  const texte = prompt(ids.length > 1 ? `Qu’est-ce qu’il faut faire sur les ${ids.length} images de « ${a.groupe} » ?` : `Qu’est-ce qu’il faut faire sur « ${nomDe(a)} » ?`, '');
+  if (texte === null) return;
+  aFaire(ids, texte.trim());
+}
+async function aFaire(ids, texte) {
+  try { await marquerAFaire(ids, texte); toast(texte === null ? 'Retiré des « À faire »' : `Dans « À faire »${ids.length > 1 ? ' : ' + ids.length + ' images' : ''}`, 'ok'); }
+  catch (e) { toast('Pas enregistré : ' + e.message, 'ko'); }
+}
+// Les images d'une animation côte à côte, ×4, sur fond transparent
+async function planche(membres) {
+  const imgs = await Promise.all(membres.map(async (m) => px.deImage(await px.charger(urlImage(m)))));
+  const k = 4, ecart = 2;
+  const H = Math.max(...imgs.map((i) => i.h)), L = imgs.reduce((s, i) => s + i.l, 0) + ecart * (imgs.length - 1);
+  const c = document.createElement('canvas');
+  c.width = L * k; c.height = H * k;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  let x = 0;
+  for (const i of imgs) { g.drawImage(px.versToile(i), x * k, (H - i.h) * k, i.l * k, i.h * k); x += i.l + ecart; }
+  telecharger(`${(membres[0].groupe || 'groupe').replace(/\//g, '_')}@4x.png`, c.toDataURL());
+}
+// Toutes les versions d'un dessin : celles du jeu (relues par la synchro) et les retouches
+async function versions(a) {
+  const dlg = $('#dlg-versions'), z = $('#versions-liste');
+  $('#versions-titre').textContent = 'Les versions de « ' + nomDe(a) + ' »';
+  z.innerHTML = '<p class="vide-grille">Lecture de l’historique…</p>';
+  dlg.showModal();
+  let liste;
+  try { liste = await depot.historique([`atelier/${a.id}.png`, ...(a.source === 'jeu' ? [`jeu/${a.id}.png`] : [])]); }
+  catch (e) { z.innerHTML = ''; z.append(el('p', { class: 'vide-grille' }, 'Historique illisible : ' + e.message)); return; }
+  z.innerHTML = '';
+  if (!liste.length) { z.append(el('p', { class: 'vide-grille' }, 'Pas encore d’autre version.')); return; }
+  liste.forEach((v, i) => {
+    const vignette = el('div', { class: 'vignette f-' + vue.fond }, '…');
+    const reprendre = el('button', { class: 'bouton petit', type: 'button', disabled: true }, i === 0 ? 'Version actuelle' : 'Reprendre');
+    const original = v.chemin.startsWith('jeu/');
+    z.append(el('div', { class: 'version' + (i === 0 ? ' actuelle' : '') }, vignette,
+      el('b', {}, v.auteur || '?'), el('span', {}, quand(v.quand)), el('span', {}, (original ? '[jeu] ' : '') + v.message.split('\n')[0]), reprendre));
+    depot.fichierA(v.chemin, v.sha).then(async (b) => {
+      vignette.innerHTML = '';
+      if (!b) { vignette.append(el('small', {}, original ? '(pas encore dans le jeu)' : '(retour à l’original)')); return; }
+      const url = URL.createObjectURL(b);
+      vignette.append(el('img', { src: url, alt: '' }));
+      if (i === 0 || verrouille(a)) return;
+      reprendre.disabled = false;
+      reprendre.onclick = async (e) => {
+        e.preventDefault();
+        if (!confirm(`Reprendre la version du ${quand(v.quand)} (${v.auteur}) ? Elle devient la retouche actuelle.`)) return;
+        try {
+          const img = px.deImage(await px.charger(url));
+          await enregistrer(a.id, px.versPng(img), { l: img.l, h: img.h, couleurs: px.couleurs(img).length });
+          dlg.close();
+          toast('Version reprise', 'ok');
+        } catch (err) { toast('Pas repris : ' + err.message, 'ko'); }
+      };
+    }).catch(() => { vignette.textContent = '?'; });
+  });
+}
 async function envoyer(a, oui) {
+
   try {
     await marquerPourLeJeu([a.id], oui);
     toast(oui ? 'Prêt pour le jeu : il arrive dans Unity à la prochaine synchro' : 'Retiré des prêts pour le jeu', 'ok');

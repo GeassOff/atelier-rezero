@@ -165,7 +165,7 @@ main { flex: 1; min-height: 0; display: flex; }
 .fiche .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
 .fiche .actions .bouton.accent { flex-basis: 100%; }
 .alerte-fiche { background: #3a1d28; border: 1px solid #7a2f35; border-radius: var(--r); padding: 6px 9px; margin-top: 10px; font-size: 12px; }
-.info-fiche { background: #2b2410; border: 1px solid #6b5420; border-radius: var(--r); padding: 6px 9px; margin-top: 10px; font-size: 12px; }
+.info-fiche { background: #1b2540; border: 1px solid #3b5590; border-radius: var(--r); padding: 6px 9px; margin-top: 10px; font-size: 12px; }
 .fiche .vide-fiche { color: var(--doux); text-align: center; margin-top: 40px; }
 .fiche .zoom-fiche { position: absolute; bottom: 6px; right: 6px; display: flex; gap: 3px; }
 .fiche .lecture { position: absolute; bottom: 6px; left: 6px; }
@@ -195,7 +195,28 @@ main { flex: 1; min-height: 0; display: flex; }
 .options .seg button { border: 0; background: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; color: var(--doux); }
 .options .seg button.actif { background: var(--panneau2); color: var(--texte); box-shadow: inset 0 -2px var(--ambre); }
 .options .sep { width: 1px; height: 22px; background: var(--bord); }
-.scene { flex: 1; min-height: 0; position: relative; overflow: hidden; background: var(--creux); }
+.zone-travail { flex: 1; min-height: 0; display: flex; }
+.scene { flex: 1; min-height: 0; min-width: 0; position: relative; overflow: hidden; background: var(--creux); }
+#reprendre-neuf { margin-top: 18px; }
+
+/* l'image à côté */
+.acote { width: var(--acote-l, 340px); flex: none; position: relative; display: flex; flex-direction: column; background: var(--creux); border-left: 1px solid var(--bord); }
+.poignee { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 2; }
+.poignee:hover { background: linear-gradient(90deg, transparent 3px, var(--ambre) 3px 5px, transparent 5px); }
+.acote-barre { display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: var(--panneau); border-bottom: 1px solid var(--bord); min-height: 42px; }
+.acote-barre b { font: 500 13px var(--titre); color: var(--doux); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.acote-barre .espace { flex: 1; }
+.acote-barre .mini { white-space: nowrap; padding: 2px 6px; }
+.acote-vue { flex: 1; min-height: 0; position: relative; overflow: hidden;
+  background: repeating-conic-gradient(#191d33 0 25%, #151829 0 50%) 0 0 / 14px 14px; }
+.acote-vue.survol { outline: 2px dashed var(--ambre); outline-offset: -6px; }
+.acote-vue canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+.acote-vue canvas.tient { cursor: grabbing; }
+.acote-vide { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; color: var(--doux); padding: 20px; pointer-events: none; font-size: 12.5px; }
+.acote.pleine .acote-vide { display: none; }
+.acote-infos { padding: 4px 10px; font: 11.5px ui-monospace, monospace; color: var(--doux); border-top: 1px solid var(--bord); background: var(--panneau); min-height: 23px; }
+.bascule.actif { background: var(--ambre); color: #1a1030; border-color: var(--ambre); }
+.nuancier.mode-groupe .pastille { outline: 1px dashed var(--ambre); outline-offset: 1px; }
 .scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
 .scene.main canvas { cursor: grab; }
 .scene.main.tient canvas { cursor: grabbing; }
@@ -262,6 +283,32 @@ dialog label input:not([type=checkbox]):not([type=range]), dialog label select {
 dialog label.case { display: flex; }
 dialog input[type=range] { width: 70%; vertical-align: middle; }
 dialog menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; margin: 16px 0 0; }
+dialog.large { width: min(860px, 94vw); max-height: 88vh; }
+dialog.large form { display: flex; flex-direction: column; max-height: calc(88vh - 40px); }
+dialog input[type=search] { width: 100%; background: var(--creux); border: 1px solid var(--bord); border-radius: var(--r); padding: 6px 9px; }
+.aide-dlg { color: var(--doux); font-size: 12px; margin: 0 0 10px; }
+.choisir-grille, .versions { flex: 1; min-height: 120px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; margin-top: 10px; }
+.carte-mini { border: 1px solid var(--bord); background: var(--creux); border-radius: var(--r); padding: 6px 4px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.carte-mini:hover { border-color: var(--ambre); }
+.carte-mini img { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; }
+.carte-mini span { font-size: 11px; color: var(--doux); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.versions { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.version { border: 1px solid var(--bord); border-radius: var(--r); padding: 8px; background: var(--creux); display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--doux); }
+.version .vignette { height: 96px; display: grid; place-items: center; border-radius: 4px; }
+.version .vignette img { max-width: 100%; max-height: 96px; image-rendering: pixelated; }
+.version b { color: var(--texte); font-weight: 600; }
+.version.actuelle { border-color: var(--ambre); }
+.aide { overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 22px; font-size: 12.5px; }
+.aide h3 { font: 500 14px var(--titre); color: var(--ambre); margin: 8px 0 6px; }
+.aide p, .aide ul { margin: 0 0 8px; color: var(--texte); }
+.aide ul { padding-left: 18px; }
+.aide li { margin-bottom: 4px; }
+.aide table { border-collapse: collapse; width: 100%; }
+.aide td { padding: 3px 6px 3px 0; vertical-align: top; color: var(--doux); }
+.aide td:nth-child(odd) { white-space: nowrap; }
+.afaire-fiche { background: #2a2147; border: 1px solid #6a52b8; border-radius: var(--r); padding: 6px 9px; margin-top: 10px; font-size: 12px; }
+.badge.afaire { color: #ffd84a; }
+@media (max-width: 900px) { .aide { grid-template-columns: 1fr; } }
 .taille-nouveau { display: flex; gap: 10px; }
 .taille-nouveau label { flex: 1; }
 .modeles { display: flex; flex-wrap: wrap; gap: 5px; }

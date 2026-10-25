@@ -1,8 +1,9 @@
 // L'Atelier Re:Zero : la bibliothèque des sprites du jeu et l'éditeur, réunis, partagés par un dépôt GitHub.
-import { etat, chargerBiblio, enregistrer, nomDe, catDe, idLibre, slug, toast, quand, urlImage } from './etat.js';
+import { etat, chargerBiblio, enregistrer, nomDe, catDe, idLibre, slug, toast, quand, urlImage, versionDe } from './etat.js';
 import * as depot from './depot.js';
 import { initBiblio, rafraichir, choisir } from './biblio.js';
-import { initEditeur, ouvrirAsset, ouvrirNeuf, surAffichage } from './editeur.js';
+import { initEditeur, ouvrirAsset, ouvrirNeuf, surAffichage, docOuvert } from './editeur.js';
+import { montrerAsset, restaurer as restaurerACote } from './acote.js';
 import { demanderFiche } from './dialogues.js';
 import * as px from './pixels.js';
 
@@ -31,8 +32,13 @@ async function nouveau() {
   const r = await demanderFiche({ titre: 'Nouveau dessin', avecTaille: true });
   if (!r) return;
   montrer('atelier');
-  ouvrirNeuf(r);
+  await ouvrirNeuf(r);
   surAffichage();
+}
+// Une image de la bibliothèque à côté de la toile
+async function aCote(a) {
+  montrer('atelier');
+  await montrerAsset(a);
 }
 async function dupliquer(a) {
   const r = await demanderFiche({ titre: 'Dupliquer', bouton: 'Dupliquer', nom: nomDe(a) + ' (copie)', categorie: catDe(a), groupe: a.groupe });
@@ -96,6 +102,9 @@ async function relire(silencieux = false) {
       rafraichir();
       majEtat();
       if (avant && avant !== depot.tete.commit && depot.tete.auteur && depot.tete.auteur !== depot.session.pseudo) toast(`${depot.tete.auteur} : ${depot.tete.message}`, 'ok');
+      // le dessin ouvert dans l'atelier vient d'être enregistré par quelqu'un d'autre
+      const d = docOuvert(), a = d && d.id && etat.biblio.assets[d.id];
+      if (a && d.version && versionDe(a) !== d.version && a.modifiePar !== depot.session.pseudo) toast(`Attention : ${a.modifiePar || 'quelqu’un'} vient d’enregistrer « ${nomDe(a)} », que tu as ouvert. En enregistrant, l’atelier te demandera quoi garder.`, 'ko');
       else if (!silencieux) toast('À jour', 'ok');
     } catch (e) { if (!silencieux) toast('Pas relu : ' + e.message, 'ko'); majEtat(); }
     finally { lecture = null; }
@@ -150,10 +159,18 @@ function connexion(raison = '') {
 }
 $('#b-pseudo').onclick = () => connexion();
 
+// ---------- L'aide ----------
+const aide = () => { if (!$('#dlg-aide').open) $('#dlg-aide').showModal(); };
+$('#b-aide').onclick = aide;
+document.addEventListener('keydown', (e) => {
+  if (e.key !== '?' || document.querySelector('dialog[open]') || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) return;
+  e.preventDefault(); aide();
+});
+
 // ---------- Démarrage ----------
 (async () => {
   initEditeur();
-  initBiblio({ ouvrir, dupliquer });
+  initBiblio({ ouvrir, dupliquer, aCote });
   montrer('biblio'); // (on arrive toujours sur la bibliothèque : rien n'est ouvert dans l'atelier)
   if (!depot.session.pseudo || (!depot.local && !depot.session.cle)) await connexion();
   for (;;) {
@@ -168,4 +185,8 @@ $('#b-pseudo').onclick = () => connexion();
   }
   rafraichir();
   majEtat();
+  restaurerACote();
+  // la première visite : le mode d'emploi
+  try { if (!localStorage.getItem('atelier-rezero-aide-vue')) { localStorage.setItem('atelier-rezero-aide-vue', '1'); aide(); } } catch {}
 })();
+

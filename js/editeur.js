@@ -1,7 +1,8 @@
 // L'atelier : l'éditeur de pixel art. Une image à la fois, en vrais pixels (1 pixel = 1 gros pixel du jeu).
 import * as px from './pixels.js';
-import { etat, nomDe, catDe, urlImage, urlOriginal, membresGroupe, enregistrer, retirerVersion, enregistrerPalettes, idLibre, slug, toast, telecharger, verrouille } from './etat.js';
+import { etat, nomDe, catDe, urlImage, urlOriginal, membresGroupe, enregistrer, enregistrerPlusieurs, retirerVersion, enregistrerPalettes, idLibre, slug, toast, telecharger, verrouille, versionDe, Conflit, quand } from './etat.js';
 import { session } from './depot.js';
+import { initACote, basculer as basculerACote, estOuvert as aCoteOuvert } from './acote.js';
 import { demanderFiche, demanderToile, demanderAjustement } from './dialogues.js';
 
 const $ = (s) => document.querySelector(s);
@@ -40,7 +41,7 @@ const OUTILS = [
 const prefs = (() => { try { return JSON.parse(localStorage.getItem('atelier-editeur') || '{}'); } catch { return {}; } })();
 const o = {
   outil: 'crayon', taille: 1, pixelParfait: true, symX: false, symY: false, trame: false, plein: false, contigu: true, grille: true, fond: 'damier',
-  prim: [26, 20, 40, 255], sec: [255, 255, 255, 255], palette: 'jeu:Le dessin de Tiago', fps: 6, fondApercu: 'bureau', pelureOpacite: 35,
+  prim: [26, 20, 40, 255], sec: [255, 255, 255, 255], palette: 'jeu:Le dessin de Tiago', fps: 6, fondApercu: 'bureau', pelureOpacite: 35, enregistrerAuto: true,
   ...prefs,
 };
 const garderPrefs = () => { try { const { outil, ...p } = o; localStorage.setItem('atelier-editeur', JSON.stringify({ ...p, outil })); } catch {} };
@@ -63,18 +64,72 @@ const ecran = () => $('#ecran');
 export function aDesChangements() { return Boolean(doc && doc.sale); }
 export function docOuvert() { return doc; }
 
-export async function ouvrirAsset(a) {
-  if (doc && doc.sale && doc.id !== a.id && !confirm(`« ${doc.nom} » a des changements pas enregistrés. Les abandonner ?`)) return false;
-  if (doc && doc.id === a.id) return true;
-  const img = px.deImage(await px.charger(urlImage(a)));
-  const original = a.source === 'jeu' ? px.deImage(await px.charger(urlOriginal(a))) : null;
-  chargerDoc({ asset: a, id: a.id, nom: nomDe(a), img, original, sale: false });
+// Avant de quitter un dessin pas enregistré : on l'enregistre (si la case est cochée), sinon on demande
+async function quitterDoc() {
+  if (!doc || !doc.sale) return true;
+  if (o.enregistrerAuto && doc.id && !verrouille(doc.asset)) return enregistrerDoc();
+  if (!confirm(`« ${doc.nom} » a des changements pas enregistrés. Les abandonner ?`)) return false;
+  oublierBrouillon();
   return true;
 }
-export function ouvrirNeuf({ nom, categorie, groupe, l, h, img }) {
-  if (doc && doc.sale && !confirm(`« ${doc.nom} » a des changements pas enregistrés. Les abandonner ?`)) return false;
+export async function ouvrirAsset(a) {
+  if (doc && doc.id === a.id) return true;
+  if (!(await quitterDoc())) return false;
+  let img = px.deImage(await px.charger(urlImage(a)));
+  const original = a.source === 'jeu' ? px.deImage(await px.charger(urlOriginal(a))) : null;
+  let sale = false;
+  // un brouillon laissé là la dernière fois (onglet fermé avant d'enregistrer) ?
+  const b = lireBrouillon(a.id);
+  if (b) {
+    const vieux = b.version !== versionDe(a);
+    if (confirm(`Tu as un brouillon pas enregistré de « ${nomDe(a)} » (${quand(b.quand)}).` + (vieux ? `\nAttention : le dessin a été enregistré depuis${a.modifiePar ? ' par ' + a.modifiePar : ''}.` : '') + '\n\nLe reprendre ?')) {
+      img = px.deImage(await px.charger(b.png)); sale = true;
+    } else localStorage.removeItem(CLE_BROUILLON + a.id);
+  }
+  chargerDoc({ asset: a, id: a.id, nom: nomDe(a), img, original, sale, version: versionDe(a) });
+  return true;
+}
+export async function ouvrirNeuf({ nom, categorie, groupe, l, h, img }) {
+  if (!(await quitterDoc())) return false;
   chargerDoc({ asset: null, id: null, nom, categorie, groupe, img: img || px.creer(l, h), original: null, sale: true });
   return true;
+}
+
+// ================== Brouillons ==================
+// À chaque changement, le dessin est gardé dans ce navigateur : si l'onglet se ferme avant
+// d'enregistrer, on le retrouve en rouvrant le dessin.
+const CLE_BROUILLON = 'atelier-brouillon:';
+const cleBrouillon = () => CLE_BROUILLON + (doc.id || 'neuf');
+function lireBrouillon(id) { try { return JSON.parse(localStorage.getItem(CLE_BROUILLON + id) || 'null'); } catch { return null; } }
+let attenteBrouillon = 0;
+function garderBrouillon() {
+  clearTimeout(attenteBrouillon);
+  attenteBrouillon = setTimeout(() => {
+    if (!doc || !doc.sale) return;
+    try {
+      localStorage.setItem(cleBrouillon(), JSON.stringify({ png: px.versPng(doc.img), quand: new Date().toISOString(), version: doc.version, nom: doc.nom, categorie: doc.categorie, groupe: doc.groupe }));
+    } catch {}
+  }, 800);
+}
+function oublierBrouillon() {
+  clearTimeout(attenteBrouillon);
+  if (doc) try { localStorage.removeItem(cleBrouillon()); } catch {}
+}
+// Un nouveau dessin jamais enregistré : on le propose quand rien n'est ouvert
+function proposerBrouillonNeuf() {
+  const z = $('#reprendre-neuf'), b = lireBrouillon('neuf');
+  z.hidden = !b;
+  if (!b) return;
+  z.innerHTML = '';
+  const lien = document.createElement('a');
+  lien.href = '#';
+  lien.textContent = `↺ Reprendre « ${b.nom} », pas enregistré (${quand(b.quand)})`;
+  lien.onclick = async (e) => {
+    e.preventDefault();
+    const img = px.deImage(await px.charger(b.png));
+    chargerDoc({ asset: null, id: null, nom: b.nom, categorie: b.categorie, groupe: b.groupe, img, original: null, sale: true });
+  };
+  z.append(lien);
 }
 function chargerDoc(d) {
   doc = d;
@@ -87,45 +142,89 @@ function chargerDoc(d) {
   majPanneau();
 }
 
-async function enregistrerDoc() {
-  if (!doc) return;
+// → vrai si c'est enregistré
+async function enregistrerDoc(forcer = false) {
+  if (!doc) return false;
   validerFlottant();
   if (!doc.id) return enregistrerSous();
   const a = etat.biblio.assets[doc.id];
   if (verrouille(a)) { toast('Une référence ne se retouche pas : enregistre ta version comme un nouveau dessin'); return enregistrerSous(); }
+  const d = doc;
   try {
-    if (a && a.source === 'jeu' && doc.original && px.egales(doc.img, doc.original)) {
-      if (a.modifie) await retirerVersion(doc.id); // identique à l'original : pas besoin d'une copie
+    if (a && a.source === 'jeu' && d.original && px.egales(d.img, d.original)) {
+      if (a.modifie) await retirerVersion(d.id); // identique à l'original : pas besoin d'une copie
       toast('Identique à l’original du jeu : rien à garder', 'ok');
     } else {
-      doc.asset = await enregistrer(doc.id, px.versPng(doc.img), { l: doc.img.l, h: doc.img.h, couleurs: px.couleurs(doc.img).length });
-      toast('Enregistré : ' + doc.nom + ' (les autres le voient dans la minute)', 'ok');
+      d.asset = await enregistrer(d.id, px.versPng(d.img), { l: d.img.l, h: d.img.h, couleurs: px.couleurs(d.img).length }, forcer ? undefined : d.version);
+      toast('Enregistré : ' + d.nom + ' (les autres le voient dans la minute)', 'ok');
     }
-    doc.sale = false;
-    majPanneau();
-  } catch (e) { toast('Pas enregistré : ' + e.message, 'ko'); }
+    d.version = versionDe(etat.biblio.assets[d.id]);
+    if (doc === d) { oublierBrouillon(); doc.sale = false; majPanneau(); }
+    return true;
+  } catch (e) {
+    if (e instanceof Conflit) {
+      // quelqu'un d'autre a enregistré ce dessin entre-temps : on ne l'écrase pas sans demander
+      if (confirm(`${e.message}.\n\nOK : remplacer sa version par la tienne (la sienne reste dans « 🕘 Versions »).\nAnnuler : enregistrer la tienne comme un nouveau dessin.`)) return enregistrerDoc(true);
+      return enregistrerSous();
+    }
+    toast('Pas enregistré : ' + e.message, 'ko');
+    return false;
+  }
 }
 async function enregistrerSous() {
-  if (!doc) return;
+  if (!doc) return false;
   validerFlottant();
   const a = doc.asset;
   const r = await demanderFiche({
     titre: doc.id ? 'Enregistrer comme nouveau' : 'Enregistrer le dessin', bouton: 'Enregistrer',
     nom: doc.id ? nomDe(a) + ' (variante)' : doc.nom, categorie: a ? catDe(a) : doc.categorie || 'creations', groupe: a ? a.groupe : doc.groupe,
   });
-  if (!r) return;
+  if (!r) return false;
   const id = idLibre('creations/' + slug(r.nom));
   try {
     const nouveau = await enregistrer(id, px.versPng(doc.img), {
       nom: r.nom, categorie: r.categorie, groupe: r.groupe, sousCategorie: a ? a.sousCategorie : 'Créations de ' + (session.pseudo || '?'),
-      tags: a ? [...new Set([...(a.tags || []).filter((t) => t !== 'calque'), 'variante'])] : [],
+      tags: a ? [...new Set([...(a.tags || []).filter((t) => t !== 'calque' && t !== 'référence'), 'variante'])] : [],
       l: doc.img.l, h: doc.img.h, couleurs: px.couleurs(doc.img).length,
     });
-    doc = { ...doc, asset: nouveau, id, nom: r.nom, original: null, sale: false };
+    oublierBrouillon();
+    doc = { ...doc, asset: nouveau, id, nom: r.nom, original: null, sale: false, version: versionDe(nouveau) };
     toast('Nouveau dessin enregistré : ' + r.nom, 'ok');
     remplirPelure();
     majPanneau();
-  } catch (e) { toast('Pas enregistré : ' + e.message, 'ko'); }
+    return true;
+  } catch (e) { toast('Pas enregistré : ' + e.message, 'ko'); return false; }
+}
+
+// ================== Une couleur, dans toutes les images du groupe ==================
+let modeGroupe = false;
+async function recolorerGroupe(de) {
+  modeGroupe = false; majCouleursImage();
+  if (!doc || !doc.asset) return;
+  const membres = membresGroupe(doc.asset).filter((m) => !verrouille(m));
+  if (membres.length < 2) return toast('Ce dessin n’est pas dans un groupe (une animation) : Maj+clic suffit');
+  if (px.memeCouleur(de, o.prim)) return toast('Choisis d’abord la nouvelle couleur (couleur principale)');
+  if (!confirm(`Remplacer ${px.versHex(de)} par ${px.versHex(o.prim)} dans les ${membres.length} images de « ${doc.asset.groupe} » ?\nTout part en un seul enregistrement.`)) return;
+  validerFlottant();
+  const liste = [];
+  let nouvelleOuverte = null;
+  for (const m of membres) {
+    const avant = m.id === doc.id ? doc.img : px.deImage(await px.charger(urlImage(m)));
+    const apres = px.remplacer(avant, de, o.prim);
+    if (px.egales(avant, apres) && !(m.id === doc.id && doc.sale)) continue;
+    if (m.id === doc.id) nouvelleOuverte = apres;
+    liste.push({ id: m.id, png: px.versPng(apres), meta: { l: apres.l, h: apres.h, couleurs: px.couleurs(apres).length }, attendu: m.id === doc.id ? doc.version : versionDe(m) });
+  }
+  if (!liste.length) return toast('Cette couleur n’est dans aucune image du groupe');
+  try {
+    await enregistrerPlusieurs(`Couleur ${px.versHex(de)} → ${px.versHex(o.prim)} dans ${doc.asset.groupe} (${liste.length} images)`, liste);
+    if (nouvelleOuverte) { memoriser(); doc.img = nouvelleOuverte; }
+    oublierBrouillon();
+    doc.sale = false; doc.version = versionDe(etat.biblio.assets[doc.id]);
+    toileImageSale = true;
+    majPanneau();
+    toast(`Couleur remplacée dans ${liste.length} image${liste.length > 1 ? 's' : ''}`, 'ok');
+  } catch (e) { toast('Pas fait : ' + e.message, 'ko'); }
 }
 
 // ================== Historique ==================
@@ -137,6 +236,7 @@ function memoriser() {
 }
 function changement() {
   doc.sale = true;
+  garderBrouillon();
   toileImageSale = true;
   majCouleursImage();
   majInfos();
@@ -394,9 +494,9 @@ function dessiner() {
   g.beginPath(); g.rect(ox, oy, L, Ht); g.clip();
   if (o.fond === 'damier') {
     const t = Math.max(4, Math.min(16, z >= 8 ? z : 8));
-    for (let y = 0; y * t < Ht; y++) for (let x = 0; x * t < L; x++) { g.fillStyle = (x + y) % 2 ? '#2a2540' : '#211d33'; g.fillRect(ox + x * t, oy + y * t, t, t); }
+    for (let y = 0; y * t < Ht; y++) for (let x = 0; x * t < L; x++) { g.fillStyle = (x + y) % 2 ? '#252a45' : '#1d2138'; g.fillRect(ox + x * t, oy + y * t, t, t); }
   } else {
-    g.fillStyle = { bureau: '#5d7896', barre: '#1f2430', clair: '#e9e4f2', noir: '#000' }[o.fond] || '#5d7896';
+    g.fillStyle = FONDS[o.fond] || FONDS.bureau;
     g.fillRect(ox, oy, L, Ht);
   }
   g.restore();
@@ -432,7 +532,7 @@ function dessiner() {
   }
   // les axes de symétrie
   g.setLineDash([6, 4]);
-  g.strokeStyle = 'rgba(255,179,71,.7)';
+  g.strokeStyle = 'rgba(195,166,255,.75)';
   if (o.symX) { g.beginPath(); g.moveTo(ox + L / 2, oy - 10); g.lineTo(ox + L / 2, oy + Ht + 10); g.stroke(); }
   if (o.symY) { g.beginPath(); g.moveTo(ox - 10, oy + Ht / 2); g.lineTo(ox + L + 10, oy + Ht / 2); g.stroke(); }
   g.setLineDash([]);
@@ -588,7 +688,8 @@ function clavier(e) {
   if (e.key === ' ') { e.preventDefault(); if (!espace) { espace = true; $('#scene').classList.add('main'); } return; }
   if (e.key === 'Alt') { e.preventDefault(); altTenu = true; return; }
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); effacerSel(); return; }
-  if (e.key === 'Escape') { deselectionner(); return; }
+  if (e.key === 'Escape') { if (modeGroupe) { modeGroupe = false; majCouleursImage(); } deselectionner(); return; }
+
   if (e.key === 'Enter') { validerFlottant(); return; }
   if (e.key === 'PageUp' || e.key === 'PageDown') { e.preventDefault(); imageVoisine(e.key === 'PageDown' ? 1 : -1); return; }
   if (e.key.startsWith('Arrow')) {
@@ -605,6 +706,7 @@ function clavier(e) {
   if (e.key === '+' || e.key === '=') { zoomer(v.zoom * 1.25 + 1); return; }
   if (e.key === '-') { zoomer(v.zoom / 1.25); return; }
   if (e.key === '0') { ajusterVue(); return; }
+  if (k === 'a') { basculerACote(); majOptions(); return; }
 }
 function clavierRelache(e) {
   if (e.key === ' ') { espace = false; $('#scene').classList.remove('main'); }
@@ -661,10 +763,11 @@ function majOptions() {
   if (t === 'pipette') texte('Clic : couleur principale. Clic droit : secondaire.');
   if (t === 'main') texte('Glisse pour bouger la vue. Molette : zoom.');
   const droite = document.createElement('span'); droite.className = 'espace'; droite.style.flex = '1'; z.append(droite);
+  caseO('enregistrerAuto', 'enregistrer en changeant d’image', 'Pg↑ / Pg↓ ou un clic sur une autre image du groupe enregistrent celle-ci d’abord');
   caseO('grille', 'grille', 'G');
   const fond = document.createElement('select');
   fond.title = 'Fond de la toile';
-  fond.innerHTML = '<option value="damier">damier</option><option value="bureau">bureau</option><option value="barre">barre des tâches</option><option value="clair">clair</option><option value="noir">noir</option>';
+  fond.innerHTML = '<option value="damier">damier</option><option value="bureau">herbe</option><option value="barre">pavés</option><option value="clair">clair</option><option value="noir">noir</option>';
   fond.value = o.fond;
   fond.onchange = () => { o.fond = fond.value; garderPrefs(); dessiner(); };
   z.append(fond);
@@ -674,6 +777,13 @@ function majOptions() {
   const zz = document.createElement('span'); zz.className = 'groupe'; zz.id = 'zoom-v'; zz.textContent = '×' + v.zoom; z.append(zz);
   bz('+', () => zoomer(v.zoom * 1.25 + 1), 'Zoomer (+)');
   bz('ajuster', ajusterVue, 'Tout voir (0)');
+  sep();
+  const ac = document.createElement('button');
+  ac.className = 'bouton petit bascule' + (aCoteOuvert() ? ' actif' : '');
+  ac.textContent = '◫ Image à côté';
+  ac.title = 'Une référence à côté de la toile : un clic dessus prend sa couleur (A)';
+  ac.onclick = () => { basculerACote(); majOptions(); };
+  z.append(ac);
 }
 
 function majCouleurs() {
@@ -792,21 +902,28 @@ function majCouleursImage() {
     if (!doc) return;
     const cs = px.couleurs(doc.img);
     $('#nb-couleurs').textContent = cs.length + ' couleur' + (cs.length > 1 ? 's' : '');
+    z.classList.toggle('mode-groupe', modeGroupe);
     for (const { c, nb } of cs) {
-      z.append(pastille(c, `${px.versHex(c)}${c[3] < 255 ? ' α' + c[3] : ''} · ${nb} px\nMaj+clic : la remplacer partout par la couleur principale`, {
+      z.append(pastille(c, modeGroupe ? `${px.versHex(c)} : clic pour la remplacer par la couleur principale dans tout le groupe` : `${px.versHex(c)}${c[3] < 255 ? ' α' + c[3] : ''} · ${nb} px\nMaj+clic : la remplacer partout par la couleur principale`, {
         onclick: (e) => {
+          if (modeGroupe) { recolorerGroupe(c); return true; }
           if (!e.shiftKey) return false;
           memoriser(); doc.img = px.remplacer(doc.img, c, o.prim); changement();
           return true;
         },
       }));
     }
+    const bg = $('#b-groupe-couleur');
+    const enGroupe = doc.asset && membresGroupe(doc.asset).length > 1;
+    bg.hidden = !enGroupe;
+    bg.classList.toggle('actif', modeGroupe);
+    bg.textContent = modeGroupe ? 'Clique la couleur à remplacer… (Échap)' : '↻ Remplacer une couleur dans tout le groupe';
     majCouleurs();
   }, 60);
 }
 
-// Les aperçus : taille réelle, ×3 comme dans le jeu, et l'animation du groupe
-const FONDS = { bureau: '#5d7896', barre: '#1f2430', clair: '#e9e4f2' };
+// Les aperçus : taille réelle, ×3, et l'animation du groupe (fonds : l'herbe et les pavés du jeu)
+const FONDS = { bureau: '#5f7a4f', barre: '#4a4b52', clair: '#e9e4f2', noir: '#000' };
 let imagesGroupe = [], animIndex = 0, animMinuteur = 0;
 function majApercus() {
   if (!doc) return;
@@ -915,7 +1032,7 @@ function majInfos() {
 
 function majPanneau() {
   const t = $('#titre-doc');
-  if (!doc) { t.innerHTML = '<small>rien d’ouvert</small>'; return; }
+  if (!doc) { t.innerHTML = '<small>rien d’ouvert</small>'; proposerBrouillonNeuf(); return; }
   const a = doc.asset;
   t.innerHTML = '';
   t.append(doc.nom);
@@ -949,6 +1066,8 @@ export function initEditeur() {
     b.onclick = () => choisirOutil(t.id);
     z.append(b);
   }
+  initACote((c, droit) => { if (droit) o.sec = [...c]; else o.prim = [...c]; majCouleurs(); });
+  $('#b-groupe-couleur').onclick = () => { modeGroupe = !modeGroupe; majCouleursImage(); };
   const c = ecran();
   c.addEventListener('pointerdown', surAppui);
   c.addEventListener('pointermove', surMouvement);
@@ -963,6 +1082,8 @@ export function initEditeur() {
     else { v.ox -= e.deltaX; dessiner(); }
   }, { passive: false });
   new ResizeObserver(() => dessiner()).observe($('#scene'));
+  // l'image à côté ouverte ou fermée : la toile se recale
+  document.addEventListener('acote-change', () => requestAnimationFrame(ajusterVue));
   document.addEventListener('keydown', clavier);
   document.addEventListener('keyup', clavierRelache);
   document.addEventListener('paste', async (e) => {

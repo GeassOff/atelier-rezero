@@ -57,31 +57,54 @@ const maintenant = () => new Date().toISOString();
 const signaler = (ids) => { for (const id of ids) document.dispatchEvent(new CustomEvent('biblio-change', { detail: { id } })); };
 
 // Ce qu'on garde quand on modifie la fiche d'un asset
-const CHAMPS_FICHE = ['nomPerso', 'categoriePerso', 'groupe', 'tags', 'favori', 'note', 'l', 'h', 'nom', 'categorie', 'sousCategorie', 'ordre', 'couleurs'];
+const CHAMPS_FICHE = ['nomPerso', 'categoriePerso', 'groupe', 'tags', 'favori', 'note', 'l', 'h', 'nom', 'categorie', 'sousCategorie', 'ordre', 'couleurs', 'aFaire'];
 
-// Enregistre une image (dataURL PNG) et/ou la fiche d'un asset : un commit dans le dépôt
-export async function enregistrer(id, png, meta = {}) {
+// La « version » de l'image d'un asset : elle change quand quelqu'un enregistre l'image, ou quand la synchro la met dans le jeu
+export const versionDe = (a) => (a ? `${a.modifie || ''}|${a.envoye || ''}` : 'neuf');
+// Quelqu'un d'autre a enregistré ce dessin depuis qu'on l'a ouvert
+export class Conflit extends Error {
+  constructor(a) { super(`${a.modifiePar || 'Quelqu’un'} a enregistré « ${nomDe(a)} » pendant que tu le modifiais`); this.asset = a; }
+}
+
+// Enregistre une image (dataURL PNG) et/ou la fiche d'un asset : un commit dans le dépôt.
+// attendu : la version ouverte dans l'atelier (si une autre a été enregistrée entre-temps : Conflit)
+export async function enregistrer(id, png, meta = {}, attendu) {
   const avant = etat.biblio.assets[id];
   const nom = meta.nom || (avant && nomDe(avant)) || id;
   const message = png ? (avant ? `Retouche : ${nom}` : `Nouveau dessin : ${nom}`) : `Fiche : ${nom}`;
+  await enregistrerPlusieurs(message, [{ id, png, meta, attendu }]);
+  return etat.biblio.assets[id];
+}
+// Plusieurs dessins en un seul commit : [{ id, png?, meta?, attendu? }]
+export async function enregistrerPlusieurs(message, liste) {
   const { idx } = await depot.valider(message, (idx) => {
-    const a = idx.assets[id];
-    if (!a && !png) throw new Error('ce dessin n’existe plus');
-    const base = a || { id, source: 'atelier', cree: maintenant(), creePar: depot.session.pseudo, tags: [] };
     const fichiers = {};
-    if (png) {
-      fichiers[`atelier/${id}.png`] = png;
-      base.modifie = maintenant(); base.modifiePar = depot.session.pseudo; base.jeuChange = false;
-      delete base.refus;
+    for (const { id, png, meta = {}, attendu } of liste) {
+      const a = idx.assets[id];
+      if (!a && !png) throw new Error('ce dessin n’existe plus');
+      if (png && attendu !== undefined && versionDe(a) !== attendu) throw new Conflit(a);
+      const base = a || { id, source: 'atelier', cree: maintenant(), creePar: depot.session.pseudo, tags: [] };
+      if (png) {
+        fichiers[`atelier/${id}.png`] = png;
+        base.modifie = maintenant(); base.modifiePar = depot.session.pseudo; base.jeuChange = false;
+        delete base.refus;
+      }
+      for (const k of CHAMPS_FICHE) if (k in meta) base[k] = meta[k];
+      idx.assets[id] = base;
     }
-    for (const k of CHAMPS_FICHE) if (k in meta) base[k] = meta[k];
-    idx.assets[id] = base;
     return fichiers;
   });
   prendre(idx);
-  signaler([id]);
-  return etat.biblio.assets[id];
+  signaler(liste.map((x) => x.id));
 }
+// « À faire » : une demande posée sur un ou plusieurs dessins (texte), ou retirée (null)
+export async function marquerAFaire(ids, texte) {
+  const aFaire = texte === null ? null : { texte, par: depot.session.pseudo, quand: maintenant() };
+  const noms = ids.map((id) => nomDe(etat.biblio.assets[id] || { id }));
+  await enregistrerPlusieurs((aFaire ? 'À faire : ' : 'Fait : ') + (noms.length > 3 ? `${noms[0]} et ${noms.length - 1} autres` : noms.join(', ')) + (aFaire && texte ? ` (${texte})` : ''),
+    ids.map((id) => ({ id, meta: { aFaire } })));
+}
+
 // Revenir à l'original (une retouche) ou supprimer (une création). Rien n'est perdu : l'historique du dépôt garde tout.
 export async function retirerVersion(id) {
   const a0 = etat.biblio.assets[id];
