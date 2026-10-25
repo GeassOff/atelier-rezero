@@ -1,9 +1,9 @@
 // L'atelier : l'éditeur de pixel art. Une image à la fois, en vrais pixels (1 pixel = 1 gros pixel du jeu).
-import * as px from './pixels.js';
-import { etat, nomDe, catDe, urlImage, urlOriginal, membresGroupe, enregistrer, enregistrerPlusieurs, retirerVersion, enregistrerPalettes, idLibre, slug, toast, telecharger, verrouille, versionDe, Conflit, quand } from './etat.js';
-import { session } from './depot.js';
-import { initACote, basculer as basculerACote, estOuvert as aCoteOuvert } from './acote.js';
-import { demanderFiche, demanderToile, demanderAjustement } from './dialogues.js';
+import * as px from './pixels.js?v=20261025235747';
+import { etat, nomDe, catDe, urlImage, urlOriginal, membresGroupe, enregistrer, enregistrerPlusieurs, retirerVersion, enregistrerPalettes, idLibre, slug, toast, telecharger, verrouille, versionDe, Conflit, quand } from './etat.js?v=20261025235747';
+import { session } from './depot.js?v=20261025235747';
+import { initACote, basculer as basculerACote, estOuvert as aCoteOuvert } from './acote.js?v=20261025235747';
+import { demanderFiche, demanderToile, demanderAjustement } from './dialogues.js?v=20261025235747';
 
 const $ = (s) => document.querySelector(s);
 const TRANSPARENT = [0, 0, 0, 0];

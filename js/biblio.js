@@ -1,7 +1,7 @@
 // La bibliothèque : tous les assets, rangés par catégorie, triables, avec leur fiche à droite.
-import { etat, CATEGORIES, nomCategorie, nomDe, catDe, sousCatDe, estRetouche, urlImage, urlOriginal, membresGroupe, enregistrer, retirerVersion, toast, quand, telecharger, marquerPourLeJeu, marquerAFaire, envoyable, verrouille } from './etat.js';
-import * as depot from './depot.js';
-import * as px from './pixels.js';
+import { etat, CATEGORIES, nomCategorie, nomDe, catDe, sousCatDe, estRetouche, urlImage, urlOriginal, membresGroupe, enregistrer, retirerVersion, toast, quand, telecharger, marquerPourLeJeu, marquerAFaire, envoyable, verrouille } from './etat.js?v=20261025235747';
+import * as depot from './depot.js?v=20261025235747';
+import * as px from './pixels.js?v=20261025235747';
 
 // Les listes du haut (pas des catégories)
 const SPECIALES = ['tout', 'afaire', 'creations-toutes', 'retouches', 'disparus', 'prets'];

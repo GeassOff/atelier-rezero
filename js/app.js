@@ -1,11 +1,11 @@
 // L'Atelier Re:Zero : la bibliothèque des sprites du jeu et l'éditeur, réunis, partagés par un dépôt GitHub.
-import { etat, chargerBiblio, enregistrer, nomDe, catDe, idLibre, slug, toast, quand, urlImage, versionDe } from './etat.js';
-import * as depot from './depot.js';
-import { initBiblio, rafraichir, choisir } from './biblio.js';
-import { initEditeur, ouvrirAsset, ouvrirNeuf, surAffichage, docOuvert } from './editeur.js';
-import { montrerAsset, restaurer as restaurerACote } from './acote.js';
-import { demanderFiche } from './dialogues.js';
-import * as px from './pixels.js';
+import { etat, chargerBiblio, enregistrer, nomDe, catDe, idLibre, slug, toast, quand, urlImage, versionDe } from './etat.js?v=20261025235747';
+import * as depot from './depot.js?v=20261025235747';
+import { initBiblio, rafraichir, choisir } from './biblio.js?v=20261025235747';
+import { initEditeur, ouvrirAsset, ouvrirNeuf, surAffichage, docOuvert } from './editeur.js?v=20261025235747';
+import { montrerAsset, restaurer as restaurerACote } from './acote.js?v=20261025235747';
+import { demanderFiche } from './dialogues.js?v=20261025235747';
+import * as px from './pixels.js?v=20261025235747';
 
 const $ = (s) => document.querySelector(s);
 

@@ -1,5 +1,5 @@
 // Les petites fenêtres : nouveau dessin / enregistrer comme nouveau, taille de la toile, couleurs.
-import { etat, CATEGORIES } from './etat.js';
+import { etat, CATEGORIES } from './etat.js?v=20261025235747';
 
 const $ = (s) => document.querySelector(s);
 
