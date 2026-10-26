@@ -1,7 +1,7 @@
 // La bibliothèque : tous les assets, rangés par catégorie, triables, avec leur fiche à droite.
-import { etat, CATEGORIES, nomCategorie, nomDe, catDe, sousCatDe, estRetouche, urlImage, urlOriginal, membresGroupe, enregistrer, retirerVersion, toast, quand, telecharger, marquerPourLeJeu, marquerAFaire, envoyable, verrouille } from './etat.js?v=20261025235747';
-import * as depot from './depot.js?v=20261025235747';
-import * as px from './pixels.js?v=20261025235747';
+import { etat, CATEGORIES, nomCategorie, nomDe, catDe, sousCatDe, estRetouche, urlImage, urlOriginal, membresGroupe, enregistrer, retirerVersion, toast, quand, telecharger, marquerPourLeJeu, marquerAFaire, envoyable, verrouille } from './etat.js?v=20261026193620';
+import * as depot from './depot.js?v=20261026193620';
+import * as px from './pixels.js?v=20261026193620';
 
 // Les listes du haut (pas des catégories)
 const SPECIALES = ['tout', 'afaire', 'creations-toutes', 'retouches', 'disparus', 'prets'];
@@ -263,7 +263,7 @@ function rendreFiche() {
   const note = el('textarea', { placeholder: 'Une idée, une chose à corriger…' }, a.note || '');
   note.addEventListener('change', () => majFiche({ note: note.value }));
 
-  const groupe = membres.length > 1 ? `${a.groupe} (${membres.length})` : a.groupe || '—';
+  const groupe = membres.length > 1 ? `${a.groupe} (${membres.length})` : a.groupe || 'aucun';
   ajout(z,
     grand,
     el('h2', {}, el('button', { class: 'mini', title: 'Favori (F)', style: 'margin-right:6px;color:' + (a.favori ? '#ffd84a' : 'var(--pale)'), onclick: () => majFiche({ favori: !a.favori }) }, a.favori ? '★' : '☆'), nomDe(a)),

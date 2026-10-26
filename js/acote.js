@@ -1,8 +1,8 @@
 // L'image à côté : une référence affichée à côté de la toile pendant qu'on dessine (une image de la
 // bibliothèque, ou une image de son PC). On y zoome et on s'y déplace sans toucher à la toile, et un clic
 // y prend la couleur (clic droit : couleur secondaire). Ce qu'on y met reste dans ce navigateur.
-import * as px from './pixels.js?v=20261025235747';
-import { etat, CATEGORIES, nomDe, catDe, sousCatDe, urlImage, verrouille } from './etat.js?v=20261025235747';
+import * as px from './pixels.js?v=20261026193620';
+import { etat, CATEGORIES, nomDe, catDe, sousCatDe, urlImage, verrouille } from './etat.js?v=20261026193620';
 
 const $ = (s) => document.querySelector(s);
 const MEMOIRE = 'atelier-acote', MEMOIRE_IMAGE = 'atelier-acote-image';

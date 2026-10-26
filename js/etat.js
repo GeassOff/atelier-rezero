@@ -1,6 +1,6 @@
 // Ce que la bibliothèque et l'atelier se partagent : l'index des assets, et quelques outils.
-import * as depot from './depot.js?v=20261025235747';
-import { urlDe } from './depot.js?v=20261025235747';
+import * as depot from './depot.js?v=20261026193620';
+import { urlDe } from './depot.js?v=20261026193620';
 
 export const etat = {
   biblio: { assets: {}, palettes: {}, palettesJeu: {} },
